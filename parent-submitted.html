@@ -1,0 +1,374 @@
+/* ============================================================
+   SPECTRA — Sensory Profile Evaluation & Clinical Therapy
+   Remote Assistant
+   Unit Terapi Cara Kerja, HTPN Kajang
+
+   shared logic: js/spectra.js
+   Loaded on every page.
+
+   IMPORTANT CONTENT NOTE:
+   The screening items in ITEM_BANK below are ORIGINAL,
+   HTPN-authored statements written for SPECTRA. They are NOT
+   the Pearson/PsychCorp Sensory Profile 2 item text, and the
+   scoring bands in scoreLabel() are NOT Dunn's published norms
+   — they are placeholder thresholds for your OT team to review
+   and calibrate clinically before any real use. If HTPN
+   obtains a licence to the real published instrument, replace
+   ITEM_BANK with the licensed items and consult Pearson's
+   permitted-use terms for digital administration.
+   ============================================================ */
+
+/* ---------------- Config ----------------
+   Fill these in to connect real Google Sheets + email sending.
+   See README.md "Connecting Google Sheets & Email" section. */
+const SPECTRA_CONFIG = {
+  // Paste your Google Apps Script Web App URL here (see README).
+  // Leave blank to run in local-only demo mode (localStorage only).
+  SHEETS_WEBHOOK_URL: "",
+  // EmailJS public key / service / template IDs (optional, see README)
+  EMAILJS_PUBLIC_KEY: "",
+  EMAILJS_SERVICE_ID: "",
+  EMAILJS_TEMPLATE_ID: "",
+};
+
+/* ---------------- Brand tokens ---------------- */
+const BRAND = {
+  bubblegum: "#FF6F91",
+  sunshine: "#FFC145",
+  mint: "#3FC1B0",
+  navy: "#16324F",
+  lavender: "#B9A6E0",
+};
+
+const QUAD_META = {
+  SK: { label_en: "Seeking", label_bm: "Mencari", color: BRAND.sunshine, emoji: "🌟" },
+  AV: { label_en: "Avoiding", label_bm: "Mengelak", color: BRAND.lavender, emoji: "🛡️" },
+  SN: { label_en: "Sensitivity", label_bm: "Kepekaan", color: BRAND.mint, emoji: "🔎" },
+  RG: { label_en: "Registration", label_bm: "Tidak Sedar", color: BRAND.bubblegum, emoji: "💤" },
+};
+
+/* ---------------- Translations ---------------- */
+const T = {
+  en: {
+    flag: "🇺🇸", langName: "English",
+    appName: "SPECTRA",
+    tagline: "Sensory Profile Evaluation & Clinical Therapy Remote Assistant",
+    chooseLang: "Choose your language / Pilih bahasa",
+    demoTitle: "Child & Caregiver Details", demoSub: "A few details before we begin",
+    name: "Child's Name", phone: "Phone Number", ic6: "IC Number (last 6 digits)",
+    age: "Age", gender: "Gender", male: "Male", female: "Female",
+    email: "Parent Email (required)", birthday: "Date of Birth",
+    emailRequired: "A valid email is required — we use this to send you the approved results.",
+    ic6Required: "Please enter exactly 6 digits.",
+    nameRequired: "Please enter the child's name.",
+    continue: "Continue", back: "Back",
+    ofWord: "of", sectionWord: "Section",
+    scaleAlmostAlways: "Almost Always (90%+)", scaleFrequently: "Frequently (75%)",
+    scaleHalf: "Half the Time (50%)", scaleOccasionally: "Occasionally (25%)",
+    scaleAlmostNever: "Almost Never (10% or less)", scaleNA: "Does Not Apply",
+    submit: "Submit Screening",
+    submitted: "Thank you! 🎉",
+    submittedSub: "Your responses have been recorded and sent to the OT team. They'll review the results and email you a home programme once approved.",
+    sheetNote: "Response saved securely. Our OT team has been notified.",
+    backHome: "Back to Home",
+    loginTitle: "Therapist Login", loginSub: "For registered HTPN OT staff only",
+    username: "Username", password: "Password", login: "Log In",
+    invalidLogin: "Invalid username or password.",
+    dashboard: "Dashboard", searchPlaceholder: "Search by IC (last 6 digits)",
+    noResults: "No patients found for that search.",
+    submittedOn: "Submitted", statusPending: "Pending Review", statusReviewed: "Reviewed & Sent",
+    viewPatient: "View", logout: "Log Out",
+    resultsTitle: "Results & Home Programme",
+    resultsNote: "Visible to Occupational Therapist portal only.",
+    quadrantSummary: "Quadrant Summary",
+    sectionSummary: "Section Scores",
+    clinicalSummary: "Clinical Summary (draft — clinician review required)",
+    editSummary: "Edit", saveSummary: "Save Changes",
+    homeProgramme: "Weekly Home Programme (editable)",
+    approve: "Approve & Send to Parent Email",
+    sentToast: "Sent to parent's email.",
+    savedToast: "Saved.",
+    days: ["Monday","Tuesday","Wednesday","Thursday","Friday","Saturday","Sunday"],
+    resetDemo: "Reset demo data",
+    parentEmailLabel: "Parent email on file",
+  },
+  bm: {
+    flag: "🇲🇾", langName: "Bahasa Melayu",
+    appName: "SPECTRA",
+    tagline: "Penilaian Profil Sensori & Pembantu Terapi Klinikal Jarak Jauh",
+    chooseLang: "Pilih bahasa / Choose your language",
+    demoTitle: "Butiran Anak & Penjaga", demoSub: "Beberapa butiran sebelum kita mula",
+    name: "Nama Anak", phone: "Nombor Telefon", ic6: "No. Kad Pengenalan (6 digit terakhir)",
+    age: "Umur", gender: "Jantina", male: "Lelaki", female: "Perempuan",
+    email: "Emel Ibu Bapa (wajib)", birthday: "Tarikh Lahir",
+    emailRequired: "Emel yang sah diperlukan — kami guna emel ini untuk hantar keputusan.",
+    ic6Required: "Sila masukkan tepat 6 digit.",
+    nameRequired: "Sila masukkan nama anak.",
+    continue: "Teruskan", back: "Kembali",
+    ofWord: "daripada", sectionWord: "Bahagian",
+    scaleAlmostAlways: "Hampir Selalu (90%+)", scaleFrequently: "Kerap (75%)",
+    scaleHalf: "Separuh Masa (50%)", scaleOccasionally: "Kadangkala (25%)",
+    scaleAlmostNever: "Hampir Tidak Pernah (10% atau kurang)", scaleNA: "Tidak Berkenaan",
+    submit: "Hantar Soal Selidik",
+    submitted: "Terima kasih! 🎉",
+    submittedSub: "Jawapan anda telah direkodkan dan dihantar kepada pasukan OT. Mereka akan menyemak dan menghantar program rumah melalui emel setelah diluluskan.",
+    sheetNote: "Jawapan disimpan dengan selamat. Pasukan OT kami telah dimaklumkan.",
+    backHome: "Kembali ke Laman Utama",
+    loginTitle: "Log Masuk Terapis", loginSub: "Untuk kakitangan OT HTPN berdaftar sahaja",
+    username: "Nama Pengguna", password: "Kata Laluan", login: "Log Masuk",
+    invalidLogin: "Nama pengguna atau kata laluan tidak sah.",
+    dashboard: "Papan Pemuka", searchPlaceholder: "Cari dengan No. KP (6 digit terakhir)",
+    noResults: "Tiada pesakit dijumpai.",
+    submittedOn: "Dihantar", statusPending: "Menunggu Semakan", statusReviewed: "Disemak & Dihantar",
+    viewPatient: "Lihat", logout: "Log Keluar",
+    resultsTitle: "Keputusan & Program Rumah",
+    resultsNote: "Hanya boleh dilihat oleh portal Occupational Therapist.",
+    quadrantSummary: "Ringkasan Kuadran",
+    sectionSummary: "Skor Bahagian",
+    clinicalSummary: "Ringkasan Klinikal (draf — perlu semakan klinisian)",
+    editSummary: "Edit", saveSummary: "Simpan Perubahan",
+    homeProgramme: "Program Mingguan di Rumah (boleh edit)",
+    approve: "Luluskan & Hantar ke Emel Ibu Bapa",
+    sentToast: "Dihantar ke emel ibu bapa.",
+    savedToast: "Disimpan.",
+    days: ["Isnin","Selasa","Rabu","Khamis","Jumaat","Sabtu","Ahad"],
+    resetDemo: "Set semula data demo",
+    parentEmailLabel: "Emel ibu bapa direkodkan",
+  },
+};
+
+function getLang() { return localStorage.getItem("spectra_lang") || "en"; }
+function setLang(l) { localStorage.setItem("spectra_lang", l); }
+function t() { return T[getLang()]; }
+
+/* ---------------- Original, HTPN-authored item bank ---------------- */
+const ITEM_BANK = {
+  auditory: { emoji: "👂", label_en: "Auditory", label_bm: "Pendengaran", items: [
+    { id: "a1", q: "SN", en: "Notices background sounds that others don't seem to hear", bm: "Perasan bunyi latar yang orang lain tidak sedar" },
+    { id: "a2", q: "AV", en: "Covers ears or looks uncomfortable around loud environments", bm: "Menutup telinga atau kelihatan tidak selesa di tempat bising" },
+    { id: "a3", q: "SK", en: "Hums, sings, or makes sounds for fun", bm: "Bersenandung, menyanyi, atau membuat bunyi untuk keseronokan" },
+    { id: "a4", q: "RG", en: "Does not respond when called by name", bm: "Tidak bertindak balas apabila dipanggil nama" },
+    { id: "a5", q: "SN", en: "Gets distracted easily by nearby conversations", bm: "Mudah terganggu oleh perbualan berdekatan" },
+  ]},
+  visual: { emoji: "👀", label_en: "Visual", label_bm: "Penglihatan", items: [
+    { id: "v1", q: "SK", en: "Seems drawn to bright lights or shiny objects", bm: "Tertarik kepada cahaya terang atau objek berkilat" },
+    { id: "v2", q: "AV", en: "Squints or turns away from bright lighting", bm: "Menyipitkan mata atau berpaling dari cahaya terang" },
+    { id: "v3", q: "RG", en: "Has difficulty locating an item in a busy space", bm: "Sukar mencari barang di ruang yang bersepah" },
+    { id: "v4", q: "SN", en: "Prefers visually simple, uncluttered spaces", bm: "Lebih suka ruang yang kemas dan tidak bersepah" },
+    { id: "v5", q: "SK", en: "Watches spinning objects or moving lights intently", bm: "Memerhati objek berpusing atau lampu bergerak dengan teliti" },
+  ]},
+  touch: { emoji: "✋", label_en: "Touch", label_bm: "Sentuhan", items: [
+    { id: "t1", q: "AV", en: "Avoids messy play such as sand, glue or paint", bm: "Mengelak permainan berselerak seperti pasir, gam atau cat" },
+    { id: "t2", q: "SK", en: "Seeks out touching different textures or surfaces", bm: "Suka menyentuh pelbagai tekstur atau permukaan" },
+    { id: "t3", q: "RG", en: "Seems unbothered by minor cuts or scrapes", bm: "Tidak kisah dengan luka atau calar kecil" },
+    { id: "t4", q: "SN", en: "Reacts strongly to certain clothing tags or seams", bm: "Bertindak balas kuat terhadap label atau jahitan baju tertentu" },
+    { id: "t5", q: "AV", en: "Becomes distressed during nail-cutting or hair-washing", bm: "Menjadi resah semasa gunting kuku atau cuci rambut" },
+  ]},
+  movement: { emoji: "🤸", label_en: "Movement", label_bm: "Pergerakan", items: [
+    { id: "m1", q: "SK", en: "Enjoys spinning, swinging or rough-and-tumble play", bm: "Suka berpusing, berayun atau bermain kasar" },
+    { id: "m2", q: "AV", en: "Avoids playground equipment like swings or slides", bm: "Mengelak alat permainan seperti buaian atau gelongsor" },
+    { id: "m3", q: "RG", en: "Seems unaware of losing balance", bm: "Tidak sedar apabila hilang keseimbangan" },
+    { id: "m4", q: "SN", en: "Notices small changes in motion that others miss", bm: "Perasan perubahan kecil pergerakan yang orang lain terlepas pandang" },
+    { id: "m5", q: "SK", en: "Fidgets or moves constantly, even when seated", bm: "Sentiasa bergerak walaupun sedang duduk" },
+  ]},
+  bodyPosition: { emoji: "🧍", label_en: "Body Position", label_bm: "Kedudukan Badan", items: [
+    { id: "b1", q: "RG", en: "Leans on furniture or people for support often", bm: "Kerap bersandar pada perabot atau orang lain" },
+    { id: "b2", q: "SK", en: "Seeks bear hugs or tight squeezing", bm: "Suka dipeluk erat atau ditekap kuat" },
+    { id: "b3", q: "RG", en: "Tires quickly during physical activity", bm: "Cepat penat semasa aktiviti fizikal" },
+    { id: "b4", q: "SN", en: "Adjusts posture frequently, seeming uncomfortable", bm: "Kerap ubah kedudukan badan, seperti tidak selesa" },
+    { id: "b5", q: "AV", en: "Seems overly cautious moving on uneven ground", bm: "Terlalu berhati-hati bergerak di permukaan tidak rata" },
+  ]},
+  oral: { emoji: "👄", label_en: "Oral", label_bm: "Mulut", items: [
+    { id: "o1", q: "SK", en: "Explores toys or objects by mouthing them", bm: "Meneroka mainan atau objek dengan memasukkan ke mulut" },
+    { id: "o2", q: "SN", en: "Is a highly selective / picky eater by texture", bm: "Sangat memilih makanan mengikut tekstur" },
+    { id: "o3", q: "AV", en: "Gags easily on certain foods", bm: "Mudah loya dengan makanan tertentu" },
+    { id: "o4", q: "RG", en: "Seems unaware of food on face or mouth", bm: "Tidak sedar ada makanan terlekat di muka atau mulut" },
+    { id: "o5", q: "SK", en: "Craves strong flavours (sour, spicy, very sweet)", bm: "Gemar rasa yang kuat (masam, pedas, terlalu manis)" },
+  ]},
+  conduct: { emoji: "🧩", label_en: "Conduct", label_bm: "Tingkah Laku", items: [
+    { id: "c1", q: "SK", en: "Acts before thinking in new situations", bm: "Bertindak sebelum berfikir dalam situasi baharu" },
+    { id: "c2", q: "AV", en: "Avoids trying new or unfamiliar activities", bm: "Mengelak mencuba aktiviti baharu atau asing" },
+    { id: "c3", q: "RG", en: "Needs several reminders to follow simple directions", bm: "Perlu diingatkan berkali-kali untuk ikut arahan mudah" },
+    { id: "c4", q: "SN", en: "Becomes upset by small changes in routine", bm: "Menjadi kecewa dengan perubahan kecil dalam rutin" },
+    { id: "c5", q: "SK", en: "Takes physical risks without regard for safety", bm: "Mengambil risiko fizikal tanpa mengambil kira keselamatan" },
+  ]},
+  socialEmotional: { emoji: "❤️", label_en: "Social Emotional", label_bm: "Sosial Emosi", items: [
+    { id: "se1", q: "AV", en: "Struggles to calm down after being upset", bm: "Sukar bertenang selepas rasa kecewa" },
+    { id: "se2", q: "AV", en: "Prefers playing alone over group play", bm: "Lebih suka bermain sendirian daripada berkumpulan" },
+    { id: "se3", q: "RG", en: "Seems unaware of others' emotional reactions", bm: "Tidak sedar reaksi emosi orang lain" },
+    { id: "se4", q: "SN", en: "Reacts strongly to noisy or crowded social settings", bm: "Bertindak balas kuat dalam suasana sosial yang bising/ramai" },
+    { id: "se5", q: "SK", en: "Seeks physical closeness or affection frequently", bm: "Kerap mahukan kedekatan fizikal atau kasih sayang" },
+  ]},
+  attentional: { emoji: "🎯", label_en: "Attentional", label_bm: "Perhatian", items: [
+    { id: "at1", q: "RG", en: "Loses focus quickly during quiet tasks", bm: "Cepat hilang fokus semasa tugasan senyap" },
+    { id: "at2", q: "SN", en: "Notices minor details others tend to miss", bm: "Perasan perincian kecil yang orang lain terlepas pandang" },
+    { id: "at3", q: "AV", en: "Avoids tasks with a lot of background activity", bm: "Mengelak tugasan dengan banyak aktiviti latar" },
+    { id: "at4", q: "SK", en: "Seeks constant novelty or new stimulation", bm: "Sentiasa mencari sesuatu yang baharu atau rangsangan baharu" },
+    { id: "at5", q: "RG", en: "Needs repeated cues to stay on task", bm: "Perlu diingatkan berulang kali untuk fokus pada tugasan" },
+  ]},
+};
+const SECTION_ORDER = ["auditory","visual","touch","movement","bodyPosition","oral","conduct","socialEmotional","attentional"];
+
+const STRATEGY_BANK = {
+  auditory: ["Use noise-reducing headphones during loud group activities.", "Give a 5-minute verbal warning before switching activities.", "Practice call-and-response name games daily."],
+  visual: ["Reduce visual clutter in the study/play corner.", "Use a visual schedule with simple icons.", "Limit screen brightness in the evening."],
+  touch: ["Introduce messy play gradually: dry textures (rice, beans) before wet (paint, glue).", "Offer firm, deep-pressure touch before light touch.", "Let the child choose clothing textures where possible."],
+  movement: ["Schedule 10–15 min of heavy movement (jumping, swinging) before seated tasks.", "Use a wobble cushion during table-top work if fidgety.", "Practice balance games on stable, then progressively uneven, surfaces."],
+  bodyPosition: ["Encourage animal walks (bear walk, crab walk) to build body awareness.", "Provide a weighted lap pad during seated tasks if tolerated.", "Take movement breaks every 20 minutes during homework."],
+  oral: ["Offer a variety of food textures in low-pressure settings (no forced eating).", "Use chewy snacks before focus-heavy tasks if oral-seeking.", "Pair new foods with a preferred food on the same plate."],
+  conduct: ["Use a first-then visual board for transitions.", "Give choices between two acceptable options to reduce impulsive refusals.", "Practice a consistent bedtime/morning routine."],
+  socialEmotional: ["Use a feelings chart to help the child name emotions.", "Rehearse calming strategies (deep breaths, counting) before stressful events.", "Schedule short, structured playdates with one peer before larger groups."],
+  attentional: ["Break homework into 10-minute chunks with movement breaks.", "Reduce background noise/visual clutter during focused tasks.", "Use a visible timer so the child can see time remaining."],
+};
+
+/* ---------------- Scoring ---------------- */
+function computeScores(answers) {
+  const quadrantTotals = { SK: { sum: 0, max: 0 }, AV: { sum: 0, max: 0 }, SN: { sum: 0, max: 0 }, RG: { sum: 0, max: 0 } };
+  const sectionScores = {};
+  SECTION_ORDER.forEach(sec => {
+    let sum = 0, max = 0;
+    ITEM_BANK[sec].items.forEach(item => {
+      const val = answers[item.id] ?? 0;
+      sum += val; max += 5;
+      quadrantTotals[item.q].sum += val;
+      quadrantTotals[item.q].max += 5;
+    });
+    sectionScores[sec] = { sum, max, pct: Math.round((sum / max) * 100) };
+  });
+  const quadrantScores = {};
+  Object.entries(quadrantTotals).forEach(([k, v]) => {
+    quadrantScores[k] = { sum: v.sum, max: v.max, pct: Math.round((v.sum / v.max) * 100) };
+  });
+  return { sectionScores, quadrantScores };
+}
+
+function scoreLabel(pct) {
+  if (pct >= 75) return { text: "Marked Pattern", color: BRAND.bubblegum };
+  if (pct >= 50) return { text: "Moderate Pattern", color: BRAND.sunshine };
+  if (pct >= 25) return { text: "Emerging Pattern", color: BRAND.mint };
+  return { text: "Typical Range", color: "#9CA3AF" };
+}
+
+function generateSummary(patient) {
+  const quads = Object.entries(patient.quadrantScores).sort((a, b) => b[1].pct - a[1].pct);
+  const top = quads[0];
+  const sections = Object.entries(patient.sectionScores).sort((a, b) => b[1].pct - a[1].pct).slice(0, 2);
+  const topLabel = QUAD_META[top[0]].label_en;
+  const secNames = sections.map(([k]) => ITEM_BANK[k].label_en).join(" and ");
+  return `${patient.name || "The child"} shows a pattern most consistent with a ${topLabel} profile on this screening (${top[1].pct}% of max in that quadrant). The highest section scores were in ${secNames}. Draft only — please verify against direct observation and clinical judgement before finalising.`;
+}
+
+function draftHomeProgramme(sectionScores) {
+  const topSections = Object.entries(sectionScores).sort((a, b) => b[1].pct - a[1].pct).slice(0, 2).map(([k]) => k);
+  const strategies = topSections.flatMap(s => STRATEGY_BANK[s]);
+  return Array(7).fill(0).map((_, i) => strategies[i % strategies.length] || "");
+}
+
+function uid() { return Date.now().toString(36) + Math.random().toString(36).slice(2, 8); }
+
+/* ---------------- Storage (localStorage demo layer) ----------------
+   Swap savePatient()/loadPatients() internals to call your backend /
+   Google Sheets webhook once SPECTRA_CONFIG.SHEETS_WEBHOOK_URL is set. */
+function savePatient(p) {
+  localStorage.setItem("spectra_patient_" + p.id, JSON.stringify(p));
+  // fire-and-forget sync to Google Sheet if configured
+  if (SPECTRA_CONFIG.SHEETS_WEBHOOK_URL) {
+    fetch(SPECTRA_CONFIG.SHEETS_WEBHOOK_URL, {
+      method: "POST",
+      mode: "no-cors",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(p),
+    }).catch(() => {/* offline-safe: local copy already saved */});
+  }
+}
+function loadPatients() {
+  const out = [];
+  for (let i = 0; i < localStorage.length; i++) {
+    const key = localStorage.key(i);
+    if (key.startsWith("spectra_patient_")) {
+      try { out.push(JSON.parse(localStorage.getItem(key))); } catch (e) {}
+    }
+  }
+  return out.sort((a, b) => b.submittedAt - a.submittedAt);
+}
+function getPatient(id) { return loadPatients().find(p => p.id === id); }
+function deleteAllPatients() {
+  const keys = [];
+  for (let i = 0; i < localStorage.length; i++) {
+    const k = localStorage.key(i);
+    if (k.startsWith("spectra_patient_")) keys.push(k);
+  }
+  keys.forEach(k => localStorage.removeItem(k));
+}
+
+/* ---------------- Email sending (optional EmailJS) ---------------- */
+function sendResultEmail(patient) {
+  if (!SPECTRA_CONFIG.EMAILJS_PUBLIC_KEY || typeof emailjs === "undefined") {
+    console.warn("SPECTRA: EmailJS not configured — running in demo mode, no real email sent.");
+    return Promise.resolve({ demo: true });
+  }
+  return emailjs.send(SPECTRA_CONFIG.EMAILJS_SERVICE_ID, SPECTRA_CONFIG.EMAILJS_TEMPLATE_ID, {
+    to_email: patient.email,
+    child_name: patient.name,
+    clinical_summary: patient.clinicalSummary,
+    home_programme: patient.homeProgramme.map((v, i) => `${T.en.days[i]}: ${v}`).join("\n"),
+  }, SPECTRA_CONFIG.EMAILJS_PUBLIC_KEY);
+}
+
+/* ---------------- Shared chrome: disclaimer + sticky banner ----------------
+   Every page includes:
+   <div id="spectra-chrome"></div>
+   and calls injectChrome() on load. */
+function disclaimerHTML(tt) {
+  return `
+  <div id="disclaimerOverlay" class="disclaimer-overlay">
+    <div class="disclaimer-box">
+      <div class="disclaimer-logo-row">
+        <div class="disclaimer-icon">🧠</div>
+        <div><h1 class="disclaimer-title">SPECTRA</h1><p class="disclaimer-subtitle">Sensory Profile Evaluation &amp; Therapy Assistant</p></div>
+      </div>
+      <p class="disclaimer-credit">Occupational Therapist HTPN Team &amp; Healthcare Intelligence Office HTPN</p>
+      <div class="disclaimer-divider"></div>
+      <div class="disclaimer-para"><span class="disclaimer-badge">⚠ HITL</span><p>All AI outputs must be reviewed and signed off by a qualified clinician. <strong>HITL verification is mandatory.</strong></p></div>
+      <div class="disclaimer-para"><span class="disclaimer-badge">🔒 Privacy</span><p>Please avoid entering more patient-identifiable information than this form requires. Data is handled per HTPN clinical data policy.</p></div>
+      <div class="disclaimer-para"><span class="disclaimer-badge">⚕ Clinical</span><p>This tool <strong>does not constitute medical advice.</strong> Clinical responsibility remains with the treating clinician.</p></div>
+      <div class="disclaimer-brand">Healthcare Intelligence Office HTPN</div>
+      <p class="disclaimer-ack">By clicking below you acknowledge these terms.</p>
+      <button class="disclaimer-btn" id="disclaimerBtn">I Understand — Enter SPECTRA</button>
+    </div>
+  </div>`;
+}
+
+function injectChrome() {
+  const tt = t();
+  const chrome = document.getElementById("spectra-chrome");
+  if (!chrome) return;
+  chrome.innerHTML = `
+    <div class="sticky-banner">⚠️ Clinician review mandatory | HTPN &nbsp;|&nbsp; All AI outputs require qualified OT sign-off before clinical use</div>
+    ${disclaimerHTML(tt)}
+  `;
+  const overlay = document.getElementById("disclaimerOverlay");
+  const btn = document.getElementById("disclaimerBtn");
+  btn.addEventListener("click", () => {
+    overlay.style.display = "none";
+    overlay.style.visibility = "hidden";
+    overlay.style.pointerEvents = "none";
+    overlay.style.zIndex = "-1";
+  });
+}
+
+function toast(msg) {
+  let el = document.getElementById("spectra-toast");
+  if (!el) {
+    el = document.createElement("div");
+    el.id = "spectra-toast";
+    el.className = "spectra-toast";
+    document.body.appendChild(el);
+  }
+  el.textContent = msg;
+  el.classList.add("show");
+  clearTimeout(el._t);
+  el._t = setTimeout(() => el.classList.remove("show"), 2600);
+}
+
+document.addEventListener("DOMContentLoaded", injectChrome);
