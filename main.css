@@ -1,0 +1,148 @@
+# SPECTRA
+**S**ensory **P**rofile **E**valuation & **C**linical **T**herapy **R**emote **A**ssistant
+Unit Terapi Cara Kerja, Hospital Tengku Permaisuri Norashikin Kajang (HTPN)
+
+A bilingual (English / Bahasa Melayu), mobile-friendly static web app for parent sensory & behavioural
+screening, with a separate Occupational Therapist portal to review, edit, and approve results.
+
+---
+
+## ⚠️ Before you use this clinically — read this
+
+The 45 screening items in `js/spectra.js` (`ITEM_BANK`) are **original, HTPN-authored statements**
+written for this prototype. They are **not** the Pearson/PsychCorp *Sensory Profile 2* (Winnie Dunn)
+item text, and the scoring bands in `scoreLabel()` are **not** Dunn's published norms — they're
+placeholder thresholds.
+
+Your OT team needs to:
+1. Clinically review and refine every item's wording
+2. Set real, validated scoring thresholds (or keep this as an unscored intake screener that
+   routes to a clinician, not a standalone diagnostic tool)
+3. Confirm the "AI-drafted" clinical summaries and home programme suggestions before anything
+   is sent to a parent — this is enforced by the disclaimer + amber banner already built in
+   (HITL sign-off), but it's a process control, not a substitute for clinical review.
+
+If HTPN has (or later obtains) a Pearson licence permitting digital administration of the real
+SP2, replace the contents of `ITEM_BANK` with the licensed items and consult Pearson's terms for
+digital/EHR use — do not simply paste the copyrighted item text into this repo without that
+licence, since the original test booklet is copyrighted and restricted.
+
+---
+
+## File structure
+
+```
+spectra/
+├── index.html                  # Landing page — role selection (Parent / Therapist)
+├── css/main.css                # All styling (design tokens at the top)
+├── js/spectra.js                # Shared: translations, item bank, scoring, storage, email
+├── pages/
+│   ├── parent-form.html          # Demographic form
+│   ├── parent-questionnaire.html # 9-section paginated screening
+│   ├── parent-submitted.html     # Confirmation screen
+│   ├── therapist-login.html      # OT login (demo credentials — see below)
+│   ├── therapist-dashboard.html  # Searchable patient list
+│   └── therapist-patient.html    # Score report, editable summary & home programme
+```
+
+## Running locally
+
+No build step — it's plain HTML/CSS/JS. Just open `index.html` in a browser, or for a cleaner
+local test (recommended, avoids some browser file:// quirks):
+
+```bash
+cd spectra
+python3 -m http.server 8000
+# then open http://localhost:8000
+```
+
+## Deploying to GitHub Pages
+
+1. Push this folder to a GitHub repo.
+2. Repo Settings → Pages → Source: `main` branch, `/root`.
+3. Your app will be live at `https://<your-username>.github.io/<repo-name>/`.
+4. Generate a QR code pointing at that URL (e.g. via any free QR generator) for parents to scan.
+
+## Demo data & login
+
+- **Therapist demo login:** `ot.htpn` / `spectra2026` (hardcoded in `therapist-login.html` — see
+  "Real authentication" below).
+- Patient records are stored in the browser's `localStorage` for this prototype, so submissions
+  only appear on the same device/browser that submitted them, **unless** you connect Google
+  Sheets (below), in which case the therapist dashboard should instead read from your backend.
+- The "Reset demo data" button on the therapist dashboard clears all locally stored records.
+
+---
+
+## Connecting Google Sheets & Email (for real deployment)
+
+This prototype is fully functional standalone, but two things are currently simulated so you can
+demo it without any backend: syncing to Google Sheets, and sending email. Here's how to wire up
+the real thing.
+
+### Option A — Google Sheets via Apps Script (recommended, free, no server needed)
+
+1. Create a Google Sheet for responses.
+2. Extensions → Apps Script, paste a script like:
+   ```javascript
+   function doPost(e) {
+     const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName("Responses");
+     const data = JSON.parse(e.postData.contents);
+     sheet.appendRow([
+       new Date(data.submittedAt), data.name, data.ic6, data.age, data.gender,
+       data.email, JSON.stringify(data.sectionScores), JSON.stringify(data.quadrantScores)
+     ]);
+     return ContentService.createTextOutput("OK");
+   }
+   ```
+3. Deploy → New deployment → Web app → Execute as "Me", Access "Anyone".
+4. Copy the deployment URL into `SPECTRA_CONFIG.SHEETS_WEBHOOK_URL` in `js/spectra.js`.
+5. Submissions will now sync to your Sheet automatically (in addition to the local copy).
+
+You can also add a `MailApp.sendEmail(...)` call inside a second Apps Script function, triggered
+from the therapist portal's "Approve & Send" button, if you'd rather send email via Apps Script
+instead of EmailJS (Option B) — this keeps everything inside Google's ecosystem.
+
+### Option B — Email via EmailJS (client-side, free tier available)
+
+1. Sign up at emailjs.com, connect a Gmail/Outlook account as the sending service.
+2. Create an email template with variables: `to_email`, `child_name`, `clinical_summary`,
+   `home_programme`.
+3. Copy your Public Key, Service ID, and Template ID into `SPECTRA_CONFIG` in `js/spectra.js`.
+4. The "Approve & Send" button will now send a real email instead of just showing a toast.
+
+---
+
+## Real authentication (important before production use)
+
+The current therapist login is a **hardcoded demo credential check in client-side JavaScript** —
+fine for a prototype, but anyone who views the page source can see it, and it doesn't support
+multiple named accounts. Before handling real patient data, replace `therapist-login.html`'s
+check with one of:
+- Firebase Authentication (email/password, free tier, quick to add)
+- Your hospital's existing staff SSO/HIS login
+- A small backend (e.g. Google Apps Script, or a lightweight Node/Express service) that verifies
+  credentials server-side and issues a session token
+
+This also unlocks per-therapist accounts and an admin-managed staff list (as requested), rather
+than one shared password.
+
+---
+
+## Mobile (Android / iOS)
+
+The app is responsive out of the box (single-column layouts under ~720px). To make it feel more
+like an installable app on phones, add to `index.html`'s `<head>`:
+```html
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#16324F">
+```
+and create a `manifest.json` with an app name, icons, and `"display": "standalone"`. Happy to
+generate that plus app icons if you'd like the "Add to Home Screen" install prompt on Android/iOS.
+
+---
+
+## Credits
+
+By Occupational Therapist HTPN Team & Healthcare Intelligence Office HTPN.
+Prototype built with Claude (Anthropic).

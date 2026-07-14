@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>SPECTRA — Therapist Dashboard</title>
+<link rel="stylesheet" href="../css/main.css"/>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Poppins:wght@600;700;800&display=swap" rel="stylesheet"/>
+</head>
+<body>
+<div id="spectra-chrome"></div>
+
+<div class="ot-topbar">
+  <div class="ot-brand"><div class="ot-badge">OT</div><span id="topbarTitle">SPECTRA — Dashboard</span></div>
+  <button class="ot-logout" id="logoutBtn">⏻ <span id="logoutLabel">Log Out</span></button>
+</div>
+
+<div class="ot-page">
+  <div class="ot-toolbar">
+    <div class="search-box">
+      🔍 <input id="searchInput" placeholder="Search by IC (last 6 digits)"/>
+    </div>
+    <button class="icon-btn" id="refreshBtn">🔄</button>
+  </div>
+
+  <div id="patientList"></div>
+  <p id="noResults" style="display:none;color:#94A3B8;font-size:0.85rem"></p>
+</div>
+
+<button class="reset-demo-btn" id="resetBtn">Reset demo data</button>
+
+<script src="../js/spectra.js"></script>
+<script>
+if (!sessionStorage.getItem("spectra_therapist")) window.location.href = "therapist-login.html";
+
+const tt = t();
+document.getElementById("topbarTitle").textContent = "SPECTRA — " + tt.dashboard;
+document.getElementById("logoutLabel").textContent = tt.logout;
+document.getElementById("searchInput").placeholder = tt.searchPlaceholder;
+document.getElementById("noResults").textContent = tt.noResults;
+document.getElementById("resetBtn").textContent = tt.resetDemo;
+
+document.getElementById("logoutBtn").addEventListener("click", () => {
+  sessionStorage.removeItem("spectra_therapist");
+  window.location.href = "../index.html";
+});
+document.getElementById("resetBtn").addEventListener("click", () => {
+  if (confirm("Clear all demo patient records?")) { deleteAllPatients(); renderList(); }
+});
+document.getElementById("refreshBtn").addEventListener("click", renderList);
+document.getElementById("searchInput").addEventListener("input", e => {
+  e.target.value = e.target.value.replace(/\D/g, "").slice(0,6);
+  renderList();
+});
+
+function renderList(){
+  const q = document.getElementById("searchInput").value;
+  const patients = loadPatients().filter(p => !q || p.ic6.includes(q));
+  const wrap = document.getElementById("patientList");
+  const noRes = document.getElementById("noResults");
+  if (patients.length === 0) { wrap.innerHTML = ""; noRes.style.display = "block"; return; }
+  noRes.style.display = "none";
+  wrap.innerHTML = patients.map(p => `
+    <button class="patient-row" data-id="${p.id}">
+      <div>
+        <div class="patient-name">${p.name} <span>•••${p.ic6}</span></div>
+        <div class="patient-date">${tt.submittedOn} ${new Date(p.submittedAt).toLocaleDateString()}</div>
+      </div>
+      <div class="row-right">
+        <span class="pill ${p.status==='reviewed'?'pill-reviewed':'pill-pending'}">${p.status==='reviewed'?tt.statusReviewed:tt.statusPending}</span>
+        <span>›</span>
+      </div>
+    </button>
+  `).join("");
+  wrap.querySelectorAll(".patient-row").forEach(btn => {
+    btn.addEventListener("click", () => window.location.href = "therapist-patient.html?id=" + btn.dataset.id);
+  });
+}
+renderList();
+</script>
+</body>
+</html>

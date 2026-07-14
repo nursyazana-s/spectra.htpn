@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>SPECTRA — Sensory Profile Evaluation & Clinical Therapy Remote Assistant</title>
+<link rel="stylesheet" href="css/main.css"/>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Poppins:wght@600;700;800&display=swap" rel="stylesheet"/>
+</head>
+<body>
+
+<div id="spectra-chrome"></div>
+
+<div class="landing-wrapper">
+  <header class="landing-header">
+    <div class="header-brand">
+      <div class="brand-icon">🧠</div>
+      <div>
+        <h1 class="brand-name" id="brandName">SPECTRA</h1>
+        <p class="brand-tagline" id="brandTagline">Sensory Profile Evaluation &amp; Clinical Therapy Remote Assistant</p>
+      </div>
+    </div>
+    <div class="header-credit">
+      <div style="font-size:.68rem;opacity:.55;margin-bottom:3px">Credit to</div>
+      By Occupational Therapist HTPN Team &amp;<br>Healthcare Intelligence Office HTPN
+    </div>
+  </header>
+
+  <div class="lang-toggle" id="langToggle"></div>
+
+  <main>
+    <div class="landing-hero">
+      <h2 class="hero-title" id="heroTitle">Welcome to <span>SPECTRA</span> 👋</h2>
+      <p class="hero-sub" id="heroSub">Please select your role to get started</p>
+      <p style="font-size:.78rem;color:var(--text-light);margin-top:6px">Unit Terapi Cara Kerja — Hospital Tengku Permaisuri Norashikin Kajang (HTPN)</p>
+    </div>
+
+    <div class="role-cards">
+      <div class="role-card parent-card" onclick="window.location.href='pages/parent-form.html'">
+        <div class="role-card-icon">👨‍👩‍👧</div>
+        <h3 class="role-card-title" id="parentTitle">Parent / Caregiver</h3>
+        <p class="role-card-desc" id="parentDesc">Complete a short sensory &amp; behavioural screening for your child. Bilingual — choose English or Bahasa Melayu. Takes about 10 minutes.</p>
+        <div class="role-card-features">
+          <span class="feature-tag" id="featQ">📋 45 Questions</span>
+          <span class="feature-tag">🌐 BM / English</span>
+          <span class="feature-tag">📊 Auto Scoring</span>
+          <span class="feature-tag" id="featTime">⏱️ ~10 min</span>
+        </div>
+        <button class="role-card-btn parent-btn" id="parentBtn">Start Screening →</button>
+      </div>
+
+      <div class="role-card therapist-card" onclick="window.location.href='pages/therapist-login.html'">
+        <div class="role-card-icon">🩺</div>
+        <h3 class="role-card-title" id="otTitle">Occupational Therapist</h3>
+        <p class="role-card-desc" id="otDesc">Access the clinical portal to view results, scores, clinical summaries, and home programmes. Review and approve before sending to parents.</p>
+        <div class="role-card-features">
+          <span class="feature-tag">🔍 Search by IC</span>
+          <span class="feature-tag">📈 Score Reports</span>
+          <span class="feature-tag">✏️ Edit &amp; Approve</span>
+          <span class="feature-tag">📧 Email to Parent</span>
+        </div>
+        <button class="role-card-btn therapist-btn" id="otBtn">🩺 OT Login →</button>
+      </div>
+    </div>
+
+    <div class="landing-info">
+      <div class="info-card">
+        <div class="info-icon">📱</div>
+        <p><strong>QR Code Access</strong><br>Scan the QR code provided by your therapist to open this form directly</p>
+      </div>
+      <div class="info-card">
+        <div class="info-icon">🔒</div>
+        <p><strong>Confidential</strong><br>Your responses are kept private and used only for clinical assessment purposes</p>
+      </div>
+      <div class="info-card">
+        <div class="info-icon">🏠</div>
+        <p><strong>Home Programme</strong><br>Receive a personalised weekly home activity plan once approved by your OT</p>
+      </div>
+    </div>
+  </main>
+
+  <footer class="landing-footer">
+    <p>SPECTRA &nbsp;|&nbsp; Unit Terapi Cara Kerja, Hospital Tengku Permaisuri Norashikin Kajang (HTPN)</p>
+    <p>Credit to By Occupational Therapist HTPN Team &amp; Healthcare Intelligence Office HTPN. For clinical use only.</p>
+  </footer>
+</div>
+
+<script src="js/spectra.js"></script>
+<script>
+function renderLandingText(){
+  const tt = t();
+  document.getElementById("brandTagline").textContent = tt.tagline;
+  document.getElementById("heroSub").textContent = tt.chooseLang;
+  document.getElementById("parentBtn").textContent = (getLang()==="en" ? "Start Screening →" : "Mula Saringan →");
+  document.getElementById("otBtn").textContent = "🩺 " + (getLang()==="en" ? "OT Login →" : "Log Masuk OT →");
+  document.getElementById("parentTitle").textContent = (getLang()==="en" ? "Parent / Caregiver" : "Ibu Bapa / Penjaga");
+  document.getElementById("parentDesc").textContent = (getLang()==="en"
+    ? "Complete a short sensory & behavioural screening for your child. Bilingual — choose English or Bahasa Melayu. Takes about 10 minutes."
+    : "Isi soal selidik ringkas sensori & tingkah laku anak anda. Dwibahasa — pilih Bahasa Melayu atau English. Mengambil masa 10 minit.");
+  document.getElementById("otTitle").textContent = (getLang()==="en" ? "Occupational Therapist" : "Occupational Therapist");
+  document.getElementById("otDesc").textContent = (getLang()==="en"
+    ? "Access the clinical portal to view results, scores, clinical summaries, and home programmes. Review and approve before sending to parents."
+    : "Akses portal klinikal untuk lihat keputusan, skor, ringkasan klinikal, dan program rumah. Semak dan luluskan sebelum hantar kepada ibu bapa.");
+}
+function renderLangToggle(){
+  const wrap = document.getElementById("langToggle");
+  wrap.innerHTML = ["en","bm"].map(l => `<button class="lang-pill ${getLang()===l?'active':''}" data-l="${l}">${T[l].flag} ${T[l].langName}</button>`).join("");
+  wrap.querySelectorAll("button").forEach(b => b.addEventListener("click", () => { setLang(b.dataset.l); renderLangToggle(); renderLandingText(); }));
+}
+renderLangToggle();
+renderLandingText();
+</script>
+</body>
+</html>
